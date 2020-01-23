@@ -12,7 +12,7 @@ var svg = d3.select("body")
             .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-var csv = d3.csv('ghc-passes-short.csv',
+var csv = d3.csv('ghc-passes-grouped.csv',
              d => {
                 d.milliseconds = +d.milliseconds;
                 d.megabytes = +d.megabytes;
@@ -55,7 +55,7 @@ function pivotAndStack( csvData ) {
                            return d;
                        })
                        .sort( (a, b) => b.total - a.total ) // descending
-                       .slice(1, 500);
+                       .slice(0, 75);
 
     let stack = d3.stack() .keys(phases);
     let dataset = stack(slowest)
