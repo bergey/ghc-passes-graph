@@ -4,7 +4,7 @@
 # Then collect the logged output into a CSV that is easier to work with
 
 DATE=$(date -u +'%F')
-stack --fast --ghc-options=-dshow-passes --no-interleaved-output
+stack build --fast --ghc-options=-dshow-passes --no-interleaved-output
 echo "package,module,phase,milliseconds,megabytes" > ${DATE}-ghc-passes.csv
 LOGDIR=.stack-work/logs
 for f in $(ls $LOGDIR); do
