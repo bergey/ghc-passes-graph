@@ -10,5 +10,5 @@ LOGDIR=.stack-work/logs
 for f in $(ls $LOGDIR); do
     cat ${LOGDIR}/$f | sed -En 's/.*!!! ([[:alpha:]]*) \[([[:alpha:].]*)\]: finished in ([[:digit:].]*) milliseconds, allocated ([[:digit:].]*) megabytes$/'"${f%.log}"',\2,\1,\3,\4/p' >> ${DATE}-ghc-passes.csv
 done
-textql -header -output-header -sql "select package, module, phase, sum(milliseconds), sum(megabytes) from \"${DATE}-ghc-passes\" group by package,module,phase" ${DATE}-ghc-passes.csv > ${DATE}-ghc-passes-grouped.csv
+textql -header -output-header -sql "select package, module, phase, sum(milliseconds) as milliseconds, sum(megabytes) as megabytes from \"${DATE}-ghc-passes\" group by package,module,phase" ${DATE}-ghc-passes.csv > ${DATE}-ghc-passes-grouped.csv
 rm ${DATE}-ghc-passes.csv
