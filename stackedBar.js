@@ -6,12 +6,11 @@ var width = 960 - margin.left - margin.right,
     height = 500 - margin.top - margin.bottom;
 
 var svg = d3.select("body")
-            .append("svg")
+            .append('svg')
             .attr("width", width + margin.left + margin.right)
             .attr("height", height + margin.top + margin.bottom)
             .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
 
 /* Data in strings like it would be if imported from a csv */
 
@@ -29,23 +28,40 @@ var data = [
     { year: "2016", redDelicious: "19", mcintosh: "17", oranges: "5", pears: "7" },
 ];
 
-var parse = d3.time.format("%Y").parse;
+var parse = d3.timeParse("%Y");
 
 
 // Transpose the data into layers
-var dataset = d3.layout.stack()(["redDelicious", "mcintosh", "oranges", "pears"].map(function(fruit) {
-    return data.map(function(d) {
-        return {x: parse(d.year), y: +d[fruit]};
-    });
-}));
+let stack = d3.stack()
+                .keys(["redDelicious", "mcintosh", "oranges", "pears"]);
+let dataset = stack(data)
+    .map(series =>
+        series.map( d => ({
+            x: d.data.year,
+            y0: d[0],
+            y: d[1]
+    })));
 
+console.log(dataset);
+
+/* var csv = d3.csv('ghc-passes-grouped.csv')
+ *             .row( d => {
+ *                 d.milliseconds = +d.milliseconds;
+ *                 d.megabytes = +d.megabytes;
+ *                 return d;
+ *             })
+ *             .get( render);
+ *
+ * function render(error, data) {
+ *  */
 
 // Set x, y and colors
-var x = d3.scale.ordinal()
+var x = d3.scaleBand()
           .domain(dataset[0].map(function(d) { return d.x; }))
-          .rangeRoundBands([10, width-10], 0.02);
+          .padding(0.1)
+          .rangeRound([10, width-10]);
 
-var y = d3.scale.linear()
+var y = d3.scaleLinear()
           .domain([0, d3.max(dataset, function(d) {  return d3.max(d, function(d) { return d.y0 + d.y; });  })])
           .range([height, 0]);
 
@@ -53,17 +69,15 @@ var colors = ["b33040", "#d25c4d", "#f2b447", "#d9d574"];
 
 
 // Define and draw axes
-var yAxis = d3.svg.axis()
+var yAxis = d3.axisLeft()
               .scale(y)
-              .orient("left")
               .ticks(5)
               .tickSize(-width, 0, 0)
               .tickFormat( function(d) { return d } );
 
-var xAxis = d3.svg.axis()
+var xAxis = d3.axisBottom()
               .scale(x)
-              .orient("bottom")
-              .tickFormat(d3.time.format("%Y"));
+              .tickFormat(d3.timeFormat("%Y"));
 
 svg.append("g")
    .attr("class", "y axis")
@@ -83,14 +97,13 @@ var groups = svg.selectAll("g.cost")
                 .style("fill", function(d, i) { return colors[i]; });
 
 var rect = groups.selectAll("rect")
-                 .data(function(d) { return d; })
+                 .data(d => d)
                  .enter()
                  .append("rect")
                  .attr("x", function(d) { return x(d.x); })
                  .attr("y", function(d) { return y(d.y0 + d.y); })
                  .attr("height", function(d) { return y(d.y0) - y(d.y0 + d.y); })
-                 .attr("width", x.rangeBand())
-                 .on("mouseover", function() { tooltip.style("display", null); })
+                 .attr("width", x.bandwidth() )
                  .on("mouseout", function() { tooltip.style("display", "none"); })
                  .on("mousemove", function(d) {
                      var xPosition = d3.mouse(this)[0] - 15;
