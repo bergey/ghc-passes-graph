@@ -1,6 +1,6 @@
 // Setup svg using Bostock's margin convention
 
-var margin = {top: 20, right: 160, bottom: 35, left: 30};
+var margin = {top: 20, right: 160, bottom: 35, left: 80};
 
 var width = 960 - margin.left - margin.right,
     height = 500 - margin.top - margin.bottom;
@@ -42,8 +42,6 @@ let dataset = stack(data)
             y: d[1]
     })));
 
-console.log(dataset);
-
 var csv = d3.csv('ghc-passes-grouped.csv',
              d => {
                 d.milliseconds = +d.milliseconds;
@@ -55,38 +53,43 @@ var csv = d3.csv('ghc-passes-grouped.csv',
 
 function pivotAndStack( csvData ) {
     let pivoted = new Map();
-    let phases = new Set();
+    let phases = [ "Parser", "Desugar", "Simplifier", "CoreTidy", "CorePrep", "CodeGen", "Simplify" ];
 
     for (const row of csvData) {
+        let name;
         if (row.module === 'Main') {
-            let name = row.package + ':Main';
+            name = row.package + ':Main';
         } else {
-            let name = row.module;
+            name = row.module;
         }
 
-        if (name in pivoted) {
-            pivoted[name][row.phase] = row.milliseconds;
+        if (pivoted.has(name)) {
+            let module = pivoted.get(name);
+            module[row.phase] = row.milliseconds;
         } else {
-            let insert = {};
-            insert.name = name;
-            insert[row.phase] = row.milliseconds;
-            pivoted[name] = insert;
+            let module = {};
+            module.name = name;
+            for (const p of phases) { module.p = 0; }
+            module[row.phase] = row.milliseconds;
+            pivoted.set(name, module);
         }
-
-        phases.add(row.phase);
 
     };
 
-    let stack = d3.stack() .keys(phases.values());
-    return stack(pivoted.values())
+    // console.log(pivoted);
+
+    let stack = d3.stack() .keys(phases);
+    let dataset = stack(Array.from(pivoted.values()))
         .map( series => series.map( d => ({
             x: d.data.name,
             y0: d[0],
             y: d[1]
         })));
+    console.log(dataset);
+    return [phases, dataset];
 }
 
-function render(_data) {
+function render([phases, dataset]) {
 
     // Set x, y and colors
     var x = d3.scaleBand()
@@ -98,8 +101,9 @@ function render(_data) {
             .domain([0, d3.max(dataset, function(d) {  return d3.max(d, function(d) { return d.y0 + d.y; });  })])
             .range([height, 0]);
 
-    var colors = ["b33040", "#d25c4d", "#f2b447", "#d9d574"];
-
+    let colors = d3.scaleOrdinal()
+                   .domain(phases)
+                   .range(d3.schemeAccent);
 
     // Define and draw axes
     var yAxis = d3.axisLeft()
@@ -127,7 +131,7 @@ function render(_data) {
                     .data(dataset)
                     .enter().append("g")
                     .attr("class", "cost")
-                    .style("fill", function(d, i) { return colors[i]; });
+                    .style("fill", function(d, i) { return colors(i); });
 
     var rect = groups.selectAll("rect")
                     .data(d => d)
@@ -135,7 +139,10 @@ function render(_data) {
                     .append("rect")
                     .attr("x", function(d) { return x(d.x); })
                     .attr("y", function(d) { return y(d.y0 + d.y); })
-                    .attr("height", function(d) { return y(d.y0) - y(d.y0 + d.y); })
+                     .attr("height", function(d) {
+                         let h = y(d.y0) - y(d.y0 + d.y)
+                         console.log(d, h);
+                         return h; })
                     .attr("width", x.bandwidth() )
                     .on("mouseout", function() { tooltip.style("display", "none"); })
                     .on("mousemove", function(d) {
@@ -148,7 +155,7 @@ function render(_data) {
 
     // Draw legend
     var legend = svg.selectAll(".legend")
-                    .data(colors)
+                    .data(colors.range())
                     .enter().append("g")
                     .attr("class", "legend")
                     .attr("transform", function(d, i) { return "translate(30," + i * 19 + ")"; });
@@ -157,21 +164,14 @@ function render(_data) {
         .attr("x", width - 18)
         .attr("width", 18)
         .attr("height", 18)
-        .style("fill", function(d, i) {return colors.slice().reverse()[i];});
+        .style("fill", function(d, i) {return colors(i);});
 
     legend.append("text")
         .attr("x", width + 5)
         .attr("y", 9)
         .attr("dy", ".35em")
         .style("text-anchor", "start")
-        .text(function(d, i) {
-            switch (i) {
-                case 0: return "Anjou pears";
-                case 1: return "Naval oranges";
-                case 2: return "McIntosh apples";
-                case 3: return "Red Delicious apples";
-            }
-        });
+        .text((d, i) => phases[i] );
 
 
     // Prep the tooltip bits, initial display is hidden
