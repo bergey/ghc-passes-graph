@@ -44,117 +44,151 @@ let dataset = stack(data)
 
 console.log(dataset);
 
-/* var csv = d3.csv('ghc-passes-grouped.csv')
- *             .row( d => {
- *                 d.milliseconds = +d.milliseconds;
- *                 d.megabytes = +d.megabytes;
- *                 return d;
- *             })
- *             .get( render);
- *
- * function render(error, data) {
- *  */
+var csv = d3.csv('ghc-passes-grouped.csv',
+             d => {
+                d.milliseconds = +d.milliseconds;
+                d.megabytes = +d.megabytes;
+                return d;
+            })
+            .then( pivotAndStack )
+            .then( render );
 
-// Set x, y and colors
-var x = d3.scaleBand()
-          .domain(dataset[0].map(function(d) { return d.x; }))
-          .padding(0.1)
-          .rangeRound([10, width-10]);
+function pivotAndStack( csvData ) {
+    let pivoted = new Map();
+    let phases = new Set();
 
-var y = d3.scaleLinear()
-          .domain([0, d3.max(dataset, function(d) {  return d3.max(d, function(d) { return d.y0 + d.y; });  })])
-          .range([height, 0]);
+    for (const row of csvData) {
+        if (row.module === 'Main') {
+            let name = row.package + ':Main';
+        } else {
+            let name = row.module;
+        }
 
-var colors = ["b33040", "#d25c4d", "#f2b447", "#d9d574"];
+        if (name in pivoted) {
+            pivoted[name][row.phase] = row.milliseconds;
+        } else {
+            let insert = {};
+            insert.name = name;
+            insert[row.phase] = row.milliseconds;
+            pivoted[name] = insert;
+        }
 
+        phases.add(row.phase);
 
-// Define and draw axes
-var yAxis = d3.axisLeft()
-              .scale(y)
-              .ticks(5)
-              .tickSize(-width, 0, 0)
-              .tickFormat( function(d) { return d } );
+    };
 
-var xAxis = d3.axisBottom()
-              .scale(x)
-              .tickFormat(d3.timeFormat("%Y"));
+    let stack = d3.stack() .keys(phases.values());
+    return stack(pivoted.values())
+        .map( series => series.map( d => ({
+            x: d.data.name,
+            y0: d[0],
+            y: d[1]
+        })));
+}
 
-svg.append("g")
-   .attr("class", "y axis")
-   .call(yAxis);
+function render(_data) {
 
-svg.append("g")
-   .attr("class", "x axis")
-   .attr("transform", "translate(0," + height + ")")
-   .call(xAxis);
+    // Set x, y and colors
+    var x = d3.scaleBand()
+            .domain(dataset[0].map(function(d) { return d.x; }))
+            .padding(0.1)
+            .rangeRound([10, width-10]);
 
+    var y = d3.scaleLinear()
+            .domain([0, d3.max(dataset, function(d) {  return d3.max(d, function(d) { return d.y0 + d.y; });  })])
+            .range([height, 0]);
 
-// Create groups for each series, rects for each segment
-var groups = svg.selectAll("g.cost")
-                .data(dataset)
-                .enter().append("g")
-                .attr("class", "cost")
-                .style("fill", function(d, i) { return colors[i]; });
-
-var rect = groups.selectAll("rect")
-                 .data(d => d)
-                 .enter()
-                 .append("rect")
-                 .attr("x", function(d) { return x(d.x); })
-                 .attr("y", function(d) { return y(d.y0 + d.y); })
-                 .attr("height", function(d) { return y(d.y0) - y(d.y0 + d.y); })
-                 .attr("width", x.bandwidth() )
-                 .on("mouseout", function() { tooltip.style("display", "none"); })
-                 .on("mousemove", function(d) {
-                     var xPosition = d3.mouse(this)[0] - 15;
-                     var yPosition = d3.mouse(this)[1] - 25;
-                     tooltip.attr("transform", "translate(" + xPosition + "," + yPosition + ")");
-                     tooltip.select("text").text(d.y);
-                 });
+    var colors = ["b33040", "#d25c4d", "#f2b447", "#d9d574"];
 
 
-// Draw legend
-var legend = svg.selectAll(".legend")
-                .data(colors)
-                .enter().append("g")
-                .attr("class", "legend")
-                .attr("transform", function(d, i) { return "translate(30," + i * 19 + ")"; });
+    // Define and draw axes
+    var yAxis = d3.axisLeft()
+                .scale(y)
+                .ticks(5)
+                .tickSize(-width, 0, 0)
+                .tickFormat( function(d) { return d } );
 
-legend.append("rect")
-      .attr("x", width - 18)
-      .attr("width", 18)
-      .attr("height", 18)
-      .style("fill", function(d, i) {return colors.slice().reverse()[i];});
+    var xAxis = d3.axisBottom()
+                .scale(x)
+                .tickFormat(d3.timeFormat("%Y"));
 
-legend.append("text")
-      .attr("x", width + 5)
-      .attr("y", 9)
-      .attr("dy", ".35em")
-      .style("text-anchor", "start")
-      .text(function(d, i) {
-          switch (i) {
-              case 0: return "Anjou pears";
-              case 1: return "Naval oranges";
-              case 2: return "McIntosh apples";
-              case 3: return "Red Delicious apples";
-          }
-      });
+    svg.append("g")
+    .attr("class", "y axis")
+    .call(yAxis);
+
+    svg.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(xAxis);
 
 
-// Prep the tooltip bits, initial display is hidden
-var tooltip = svg.append("g")
-                 .attr("class", "tooltip")
-                 .style("display", "none");
+    // Create groups for each series, rects for each segment
+    var groups = svg.selectAll("g.cost")
+                    .data(dataset)
+                    .enter().append("g")
+                    .attr("class", "cost")
+                    .style("fill", function(d, i) { return colors[i]; });
 
-tooltip.append("rect")
-       .attr("width", 30)
-       .attr("height", 20)
-       .attr("fill", "white")
-       .style("opacity", 0.5);
+    var rect = groups.selectAll("rect")
+                    .data(d => d)
+                    .enter()
+                    .append("rect")
+                    .attr("x", function(d) { return x(d.x); })
+                    .attr("y", function(d) { return y(d.y0 + d.y); })
+                    .attr("height", function(d) { return y(d.y0) - y(d.y0 + d.y); })
+                    .attr("width", x.bandwidth() )
+                    .on("mouseout", function() { tooltip.style("display", "none"); })
+                    .on("mousemove", function(d) {
+                        var xPosition = d3.mouse(this)[0] - 15;
+                        var yPosition = d3.mouse(this)[1] - 25;
+                        tooltip.attr("transform", "translate(" + xPosition + "," + yPosition + ")");
+                        tooltip.select("text").text(d.y);
+                    });
 
-tooltip.append("text")
-       .attr("x", 15)
-       .attr("dy", "1.2em")
-       .style("text-anchor", "middle")
-       .attr("font-size", "12px")
-       .attr("font-weight", "bold");
+
+    // Draw legend
+    var legend = svg.selectAll(".legend")
+                    .data(colors)
+                    .enter().append("g")
+                    .attr("class", "legend")
+                    .attr("transform", function(d, i) { return "translate(30," + i * 19 + ")"; });
+
+    legend.append("rect")
+        .attr("x", width - 18)
+        .attr("width", 18)
+        .attr("height", 18)
+        .style("fill", function(d, i) {return colors.slice().reverse()[i];});
+
+    legend.append("text")
+        .attr("x", width + 5)
+        .attr("y", 9)
+        .attr("dy", ".35em")
+        .style("text-anchor", "start")
+        .text(function(d, i) {
+            switch (i) {
+                case 0: return "Anjou pears";
+                case 1: return "Naval oranges";
+                case 2: return "McIntosh apples";
+                case 3: return "Red Delicious apples";
+            }
+        });
+
+
+    // Prep the tooltip bits, initial display is hidden
+    var tooltip = svg.append("g")
+                    .attr("class", "tooltip")
+                    .style("display", "none");
+
+    tooltip.append("rect")
+        .attr("width", 30)
+        .attr("height", 20)
+        .attr("fill", "white")
+        .style("opacity", 0.5);
+
+    tooltip.append("text")
+        .attr("x", 15)
+        .attr("dy", "1.2em")
+        .style("text-anchor", "middle")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold");
+}
