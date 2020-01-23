@@ -134,7 +134,7 @@ function render([phases, dataset]) {
 
     // Draw legend
     var legend = svg.selectAll(".legend")
-                    .data(colors.range())
+                    .data(phases)
                     .enter().append("g")
                     .attr("class", "legend")
                     .attr("transform", function(d, i) { return "translate(30," + i * 19 + ")"; });
