@@ -69,7 +69,7 @@ function pivotAndStack( csvData ) {
         } else {
             let module = {};
             module.name = name;
-            for (const p of phases) { module.p = 0; }
+            for (const p of phases) { module[p] = 0; }
             module[row.phase] = row.milliseconds;
             pivoted.set(name, module);
         }
@@ -83,7 +83,8 @@ function pivotAndStack( csvData ) {
         .map( series => series.map( d => ({
             x: d.data.name,
             y0: d[0],
-            y: d[1]
+            y: d[1],
+            data: d.data
         })));
     console.log(dataset);
     return [phases, dataset];
@@ -141,7 +142,7 @@ function render([phases, dataset]) {
                     .attr("y", function(d) { return y(d.y0 + d.y); })
                      .attr("height", function(d) {
                          let h = y(d.y0) - y(d.y0 + d.y)
-                         console.log(d, h);
+                         if (isNaN(h)) { console.log(d); }
                          return h; })
                     .attr("width", x.bandwidth() )
                     .on("mouseout", function() { tooltip.style("display", "none"); })
