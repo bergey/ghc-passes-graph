@@ -1,9 +1,9 @@
 // Setup svg using Bostock's margin convention
 
-var margin = {top: 20, right: 160, bottom: 35, left: 80};
+var margin = {top: 20, right: 160, bottom: 250, left: 80};
 
-var width = 960 - margin.left - margin.right,
-    height = 500 - margin.top - margin.bottom;
+var width = 1200 - margin.left - margin.right,
+    height = 800 - margin.top - margin.bottom;
 
 var svg = d3.select("body")
             .append('svg')
@@ -42,7 +42,7 @@ let dataset = stack(data)
             y: d[1]
     })));
 
-var csv = d3.csv('ghc-passes-grouped.csv',
+var csv = d3.csv('ghc-passes-short.csv',
              d => {
                 d.milliseconds = +d.milliseconds;
                 d.megabytes = +d.megabytes;
@@ -78,8 +78,17 @@ function pivotAndStack( csvData ) {
 
     // console.log(pivoted);
 
+    let slowest = Array.from(pivoted.values())
+                       .map( d => {
+                           d.total = 0;
+                           for (const p of phases) { d.total += d[p]; }
+                           return d;
+                       })
+                       .sort( (a, b) => b.total - a.total ) // descending
+                       .slice(0, 500);
+
     let stack = d3.stack() .keys(phases);
-    let dataset = stack(Array.from(pivoted.values()))
+    let dataset = stack(slowest)
         .map( series => series.map( d => ({
             x: d.data.name,
             y0: d[0],
@@ -114,17 +123,22 @@ function render([phases, dataset]) {
                 .tickFormat( function(d) { return d } );
 
     var xAxis = d3.axisBottom()
-                .scale(x)
-                .tickFormat(d3.timeFormat("%Y"));
+                .scale(x);
 
     svg.append("g")
     .attr("class", "y axis")
     .call(yAxis);
 
     svg.append("g")
-    .attr("class", "x axis")
-    .attr("transform", "translate(0," + height + ")")
-    .call(xAxis);
+       .attr("class", "x axis")
+       .attr("transform", "translate(0," + height + ")")
+       .call(xAxis)
+       .selectAll("text")
+       .attr("y", 0)
+       .attr("x", 9)
+       .attr("dy", ".35em")
+       .attr("transform", "rotate(90)")
+       .style("text-anchor", "start");
 
 
     // Create groups for each series, rects for each segment
@@ -146,6 +160,7 @@ function render([phases, dataset]) {
                          return h; })
                     .attr("width", x.bandwidth() )
                     .on("mouseout", function() { tooltip.style("display", "none"); })
+                    .on("mousein", function() { tooltip.style("display", "block"); })
                     .on("mousemove", function(d) {
                         var xPosition = d3.mouse(this)[0] - 15;
                         var yPosition = d3.mouse(this)[1] - 25;
