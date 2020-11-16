@@ -3,12 +3,35 @@
 # Run stack with output about GHC passes
 # Then collect the logged output into a CSV that is easier to work with
 
+function require {
+    type $1 || (echo "need $1 on PATH" && exit 1)
+}
+require textql
+require loc
+
 DATE=$(date -u +'%F')
-stack build --fast --ghc-options=-dshow-passes --no-interleaved-output
-echo "package,module,phase,milliseconds,megabytes" > ${DATE}-ghc-passes.csv
+PASSES="${DATE}-ghc-passes.csv"
+GROUPED="${DATE}-ghc-passes-grouped.csv"
+
+# stack build --fast --ghc-options=-dshow-passes --no-interleaved-output
+echo "package,module,phase,milliseconds,megabytes" > ${PASSES}
 LOGDIR=.stack-work/logs
-for f in $(ls $LOGDIR); do
-    cat ${LOGDIR}/$f | sed -En 's/.*!!! ([[:alpha:]]*) \[([[:alpha:].]*)\]: finished in ([[:digit:].]*) milliseconds, allocated ([[:digit:].]*) megabytes$/'"${f%.log}"',\2,\1,\3,\4/p' >> ${DATE}-ghc-passes.csv
+for f in $LOGDIR/*.log; do
+    package=$(basename $f | sed 's/.log$//')
+    cat $f | sed -En 's/.*!!! ([[:alpha:]]*) \[([[:alpha:].]*)\]: finished in ([[:digit:].]*) milliseconds, allocated ([[:digit:].]*) megabytes$/'"${package}"',\2,\1,\3,\4/p' >> ${DATE}-ghc-passes.csv
 done
-textql -header -output-header -sql "select package, module, phase, sum(milliseconds) as milliseconds, sum(megabytes) as megabytes from \"${DATE}-ghc-passes\" group by package,module,phase" ${DATE}-ghc-passes.csv > ${DATE}-ghc-passes-grouped.csv
-rm ${DATE}-ghc-passes.csv
+textql -header -output-header -sql "select package, module, phase, sum(milliseconds) as milliseconds, sum(megabytes) as megabytes from \"${DATE}-ghc-passes\" group by package,module,phase" ${PASSES} > ${GROUPED}
+# rm ${DATE}-ghc-passes.csv
+
+LINES="${DATE}-module-lines.csv"
+SCATTER="${DATE}-time-vs-lines.csv"
+
+echo 'module,lines,blank,comment,code' > "$LINES"
+for filename in $(find . -name .stack-work -prune -o -name dist-newstyle -prune -o -name '*.hs' -print); do
+    # echo $filename # debug
+    module=$(sed -n 's/^module \([^ ]*\).*/\1/p' "$filename")
+    lines=$(loc "$filename" | awk ' BEGIN { OFS=","; } $1 ~ /Haskell/ { print $3, $4, $5, $6; }')
+    echo "${module},${lines}" >> "$LINES"
+done
+
+textql -header -output-header -sql 'select time.module, milliseconds, code_lines from (select module, sum(milliseconds) as milliseconds from "2020-11-16-ghc-passes-grouped" group by module) as time join (select module, sum(code) as code_lines from "2020-11-16-module-lines" group by module) as lines using (module)' ${GROUPED} ${LINES} > ${SCATTER}
