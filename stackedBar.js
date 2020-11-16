@@ -7,6 +7,7 @@ var width = 1200 - margin.left - margin.right,
 
 var svg = d3.select("body")
             .append('svg')
+            .attr("id", "stacked-bar")
             .attr("width", width + margin.left + margin.right)
             .attr("height", height + margin.top + margin.bottom)
             .append("g")
