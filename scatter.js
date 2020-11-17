@@ -13,13 +13,16 @@ var scatter = d3.select("body")
             .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-d3.csv('time-vs-lines.csv',
+let time_vs_lines = d3.csv('time-vs-lines.csv',
              d => {
                 d.milliseconds = +d.milliseconds;
                 d.lines = +d.code_lines;
+                d.ms_per_line = d.milliseconds / d.lines;
                 return d;
-            })
-            .then( render_scatter );
+    })
+    .then(modules => modules.sort((a, b) => d3.ascending(a.ms_per_line, b.ms_per_line)));
+
+time_vs_lines.then( render_scatter );
 
 function render_scatter(modules) {
     let x = d3.scaleLinear()
@@ -53,6 +56,6 @@ function render_scatter(modules) {
                   .append("circle")
                   .attr("cx", d => x(d.lines))
                   .attr("cy", d => y(d.milliseconds))
-                  .attr("r", 3)
+                  .attr("r", 2)
                   .attr("fill-opacity", 0.2);
     }
