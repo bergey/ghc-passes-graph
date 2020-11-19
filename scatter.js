@@ -33,7 +33,7 @@ function render_scatter(modules) {
 
     let y = d3.scaleLinear()
     /* .domain([0, d3.max(modules, d => d.milliseconds)]) */
-    .domain([0, 10000]) // TODO zoom instead of hard-coded domain
+              .domain([0, 40]) // TODO zoom instead of hard-coded domain
               .range([height, 0]);
 
     let xAxis = d3.axisBottom()
@@ -42,20 +42,39 @@ function render_scatter(modules) {
     let yAxis = d3.axisLeft()
                   .scale(y);
 
-    scatter.append("g")
-    .attr("class", "y axis")
-    .call(yAxis);
+    let yg = scatter.append("g")
+    .attr("class", "y axis");
+    yg.call(yAxis);
+    yg.append('text')
+      .text('Compile Time [s]')
+      .attr('font-size', 14)
+      .attr("transform",'rotate(-90)')
+      .attr('x', height / -2)
+      .attr('fill', 'black')
+      .attr('y', -50);
 
-    scatter.append("g")
+
+    let xg = scatter.append("g")
        .attr("class", "x axis")
-       .attr("transform", "translate(0," + height + ")")
-       .call(xAxis);
+       .attr("transform", "translate(0," + height + ")");
 
-    let dots = scatter.selectAll("circle")
+    xg.call(xAxis);
+    xg.append('text')
+      .text('Lines of Code')
+      .attr('font-size', 14)
+      .attr('x', width / 2)
+      .attr('fill', 'black')
+      .attr('y', margin.bottom/2);
+
+    let dots = scatter.append('g').attr('class', 'data').selectAll("circle")
                   .data(modules).enter()
                   .append("circle")
                   .attr("cx", d => x(d.lines))
-                  .attr("cy", d => y(d.milliseconds))
+                  .attr("cy", d => y(d.ms_per_line))
                   .attr("r", 2)
                   .attr("fill-opacity", 0.2);
+
+    scatter.append('text').text('Compile Time vs Code Size')
+           .attr('font-size', 24).attr('fill', 'black')
+           .attr('x', 0.75*width).attr('y', y(35));
     }
